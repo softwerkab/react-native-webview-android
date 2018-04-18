@@ -2,6 +2,7 @@ package com.burnweb.rnwebview;
 
 import android.annotation.SuppressLint;
 
+import android.content.Intent;
 import android.net.Uri;
 import android.graphics.Bitmap;
 import android.os.Build;
@@ -13,6 +14,7 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.util.Log;
 
 import com.facebook.react.common.SystemClock;
 import com.facebook.react.bridge.LifecycleEventListener;
@@ -58,6 +60,19 @@ class RNWebView extends WebView implements LifecycleEventListener {
 
     protected class CustomWebChromeClient extends WebChromeClient {
         @Override
+        public boolean onCreateWindow(WebView view, boolean dialog, boolean userGesture, android.os.Message resultMsg) {
+            String data = view.getHitTestResult().getExtra();
+            if (data != null) {
+                Uri uri = Uri.parse(data);
+                view.getContext().startActivity(new Intent(Intent.ACTION_VIEW, uri));
+            } else {
+                Log.e("RNWebView", "WebView tried to open a link in new window but did not provide URL, ignoring...");
+            }
+
+            return false;
+        }
+
+        @Override
         public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
             getModule().showAlert(url, message, result);
             return true;
@@ -100,6 +115,7 @@ class RNWebView extends WebView implements LifecycleEventListener {
         this.getSettings().setLoadsImagesAutomatically(true);
         this.getSettings().setBlockNetworkImage(false);
         this.getSettings().setBlockNetworkLoads(false);
+        this.getSettings().setSupportMultipleWindows(true);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             this.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
@@ -177,7 +193,7 @@ class RNWebView extends WebView implements LifecycleEventListener {
     }
 
     @JavascriptInterface
-     public void postMessage(String jsParamaters) {
+    public void postMessage(String jsParamaters) {
         mEventDispatcher.dispatchEvent(new MessageEvent(getId(), jsParamaters));
     }
 }
