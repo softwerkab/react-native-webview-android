@@ -38,7 +38,7 @@ var WebViewAndroid = createClass({
   },
   _onMessage: function(event) {
     if (this.props.onMessage) {
-      this.props.onMessage(event.nativeEvent);
+      this.props.onMessage({ nativeEvent: { data: JSON.parse(event.nativeEvent.message) }});
     }
   },
   goBack: function() {
@@ -85,12 +85,11 @@ var WebViewAndroid = createClass({
   },
   render: function() {
     return (
-      <RNWebViewAndroid 
-        ref={WEBVIEW_REF} 
-        {...this.props} 
-        onNavigationStateChange={this._onNavigationStateChange} 
-        onMessageEvent={this._onMessage} 
-      />
+      <RNWebViewAndroid
+        ref={WEBVIEW_REF}
+        {...this.props}
+        onNavigationStateChange={this._onNavigationStateChange}
+        onMessageEvent={this._onMessage}/>
     );
   },
   _getWebViewHandle: function() {

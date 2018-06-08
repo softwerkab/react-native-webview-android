@@ -17,12 +17,15 @@ import android.webkit.WebViewClient;
 import android.util.Log;
 
 import com.facebook.react.common.SystemClock;
+import com.facebook.react.common.build.ReactBuildConfig;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.UIManagerModule;
 import com.facebook.react.uimanager.events.EventDispatcher;
 
 class RNWebView extends WebView implements LifecycleEventListener {
+
+    protected static final String BRIDGE_NAME = "__REACT_WEB_VIEW_BRIDGE";
 
     private final EventDispatcher mEventDispatcher;
     private final RNWebViewManager mViewManager;
@@ -47,6 +50,8 @@ class RNWebView extends WebView implements LifecycleEventListener {
 
         public void onPageFinished(WebView view, String url) {
             mEventDispatcher.dispatchEvent(new NavigationStateChangeEvent(getId(), SystemClock.nanoTime(), view.getTitle(), false, url, view.canGoBack(), view.canGoForward()));
+
+            RNWebView.this.linkBridge();
 
             if(RNWebView.this.getInjectedJavaScript() != null) {
                 view.loadUrl("javascript:(function() {\n" + RNWebView.this.getInjectedJavaScript() + ";\n})();");
@@ -124,7 +129,11 @@ class RNWebView extends WebView implements LifecycleEventListener {
         this.setWebViewClient(new EventWebClient());
         this.setWebChromeClient(getCustomClient());
 
-        this.addJavascriptInterface(RNWebView.this, "webView");
+        if (ReactBuildConfig.DEBUG && Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            WebView.setWebContentsDebuggingEnabled(true);
+        }
+
+        this.addJavascriptInterface(RNWebView.this, BRIDGE_NAME);
     }
 
     public void setCharset(String charset) {
@@ -193,7 +202,16 @@ class RNWebView extends WebView implements LifecycleEventListener {
     }
 
     @JavascriptInterface
-    public void postMessage(String jsParamaters) {
-        mEventDispatcher.dispatchEvent(new MessageEvent(getId(), jsParamaters));
+    public void postMessage(String message) {
+        mEventDispatcher.dispatchEvent(new MessageEvent(getId(), message));
+    }
+
+    public void linkBridge() {
+      loadUrl("javascript:(" +
+        "window.originalPostMessage = window.postMessage," +
+        "window.postMessage = function(data) {" +
+          BRIDGE_NAME + ".postMessage(JSON.stringify(data));" +
+        "}" +
+      ")");
     }
 }
