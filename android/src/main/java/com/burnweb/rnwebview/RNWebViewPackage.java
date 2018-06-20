@@ -1,6 +1,7 @@
 package com.burnweb.rnwebview;
 
-import com.facebook.react.ReactPackage;
+import com.facebook.react.ReactInstancePackage;
+import com.facebook.react.ReactInstanceManager;
 import com.facebook.react.bridge.JavaScriptModule;
 import com.facebook.react.bridge.NativeModule;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -8,14 +9,16 @@ import com.facebook.react.uimanager.ViewManager;
 
 import java.util.*;
 
-
-public class RNWebViewPackage implements ReactPackage {
+public class RNWebViewPackage extends ReactInstancePackage {
 
     private RNWebViewModule module;
     private RNWebViewManager viewManager;
+    private ReactInstanceManager reactInstanceManager;
 
     @Override
-    public List<NativeModule> createNativeModules(ReactApplicationContext reactContext) {
+    public List<NativeModule> createNativeModules(ReactApplicationContext reactContext, ReactInstanceManager reactInstanceManager) {
+        this.reactInstanceManager = reactInstanceManager;
+
         module = new RNWebViewModule(reactContext);
         module.setPackage(this);
 
@@ -46,4 +49,7 @@ public class RNWebViewPackage implements ReactPackage {
         return viewManager;
     }
 
+    public ReactInstanceManager getReactInstanceManager() {
+        return reactInstanceManager;
+    }
 }

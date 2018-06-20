@@ -16,6 +16,8 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.util.Log;
 
+import com.facebook.react.ReactActivity;
+import com.facebook.react.ReactInstanceManager;
 import com.facebook.react.common.SystemClock;
 import com.facebook.react.common.build.ReactBuildConfig;
 import com.facebook.react.bridge.LifecycleEventListener;
@@ -34,6 +36,7 @@ class RNWebView extends WebView implements LifecycleEventListener {
     private String baseUrl = "file:///";
     private String injectedJavaScript = null;
     private boolean allowUrlRedirect = false;
+    private ReactInstanceManager reactInstanceManager;
 
     protected class EventWebClient extends WebViewClient {
         public boolean shouldOverrideUrlLoading(WebView view, String url){
@@ -129,7 +132,13 @@ class RNWebView extends WebView implements LifecycleEventListener {
         this.setWebViewClient(new EventWebClient());
         this.setWebChromeClient(getCustomClient());
 
-        if (ReactBuildConfig.DEBUG && Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+        boolean devModeIsEnabled = viewManager
+            .getPackage()
+            .getReactInstanceManager()
+            .getDevSupportManager()
+            .getDevSupportEnabled();
+
+        if (devModeIsEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             WebView.setWebContentsDebuggingEnabled(true);
         }
 
