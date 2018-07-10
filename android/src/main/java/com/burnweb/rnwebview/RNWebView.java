@@ -2,6 +2,7 @@ package com.burnweb.rnwebview;
 
 import android.annotation.SuppressLint;
 
+import android.content.Intent;
 import android.net.Uri;
 import android.graphics.Bitmap;
 import android.os.Build;
@@ -13,14 +14,21 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.util.Log;
 
-import com.facebook.react.common.SystemClock;
+import com.facebook.react.ReactActivity;
+import com.facebook.react.ReactInstanceManager;
+import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.LifecycleEventListener;
+import com.facebook.react.common.SystemClock;
+import com.facebook.react.common.build.ReactBuildConfig;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.UIManagerModule;
 import com.facebook.react.uimanager.events.EventDispatcher;
 
 class RNWebView extends WebView implements LifecycleEventListener {
+
+    protected static final String BRIDGE_NAME = "__REACT_WEB_VIEW_BRIDGE";
 
     private final EventDispatcher mEventDispatcher;
     private final RNWebViewManager mViewManager;
@@ -29,22 +37,31 @@ class RNWebView extends WebView implements LifecycleEventListener {
     private String baseUrl = "file:///";
     private String injectedJavaScript = null;
     private boolean allowUrlRedirect = false;
+    private ReactInstanceManager reactInstanceManager;
+
+    private String currentUrl = "";
+    private String shouldOverrideUrlLoadingUrl = "";
 
     protected class EventWebClient extends WebViewClient {
         public boolean shouldOverrideUrlLoading(WebView view, String url){
-            if(RNWebView.this.getAllowUrlRedirect()) {
-                // do your handling codes here, which url is the requested url
-                // probably you need to open that url rather than redirect:
-                view.loadUrl(url);
+            int navigationType = 0;
 
-                return false; // then it is not handled by default action
+            if (currentUrl.equals(url) || url.equals("about:blank")) { // for regular .reload() and html reload.
+                navigationType = 3;
             }
 
-            return super.shouldOverrideUrlLoading(view, url);
+            shouldOverrideUrlLoadingUrl = url;
+            mEventDispatcher.dispatchEvent(new ShouldOverrideUrlLoadingEvent(getId(), SystemClock.nanoTime(), url, navigationType));
+
+            return true;
         }
 
         public void onPageFinished(WebView view, String url) {
             mEventDispatcher.dispatchEvent(new NavigationStateChangeEvent(getId(), SystemClock.nanoTime(), view.getTitle(), false, url, view.canGoBack(), view.canGoForward()));
+
+            currentUrl = url;
+
+            RNWebView.this.linkBridge();
 
             if(RNWebView.this.getInjectedJavaScript() != null) {
                 view.loadUrl("javascript:(function() {\n" + RNWebView.this.getInjectedJavaScript() + ";\n})();");
@@ -57,6 +74,19 @@ class RNWebView extends WebView implements LifecycleEventListener {
     }
 
     protected class CustomWebChromeClient extends WebChromeClient {
+        @Override
+        public boolean onCreateWindow(WebView view, boolean dialog, boolean userGesture, android.os.Message resultMsg) {
+            String data = view.getHitTestResult().getExtra();
+            if (data != null) {
+                Uri uri = Uri.parse(data);
+                view.getContext().startActivity(new Intent(Intent.ACTION_VIEW, uri));
+            } else {
+                Log.e("RNWebView", "WebView tried to open a link in new window but did not provide URL, ignoring...");
+            }
+
+            return false;
+        }
+
         @Override
         public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
             getModule().showAlert(url, message, result);
@@ -100,6 +130,7 @@ class RNWebView extends WebView implements LifecycleEventListener {
         this.getSettings().setLoadsImagesAutomatically(true);
         this.getSettings().setBlockNetworkImage(false);
         this.getSettings().setBlockNetworkLoads(false);
+        this.getSettings().setSupportMultipleWindows(true);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             this.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
@@ -108,7 +139,17 @@ class RNWebView extends WebView implements LifecycleEventListener {
         this.setWebViewClient(new EventWebClient());
         this.setWebChromeClient(getCustomClient());
 
-        this.addJavascriptInterface(RNWebView.this, "webView");
+        boolean devModeIsEnabled = viewManager
+            .getPackage()
+            .getReactInstanceManager()
+            .getDevSupportManager()
+            .getDevSupportEnabled();
+
+        if (devModeIsEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            WebView.setWebContentsDebuggingEnabled(true);
+        }
+
+        this.addJavascriptInterface(RNWebView.this, BRIDGE_NAME);
     }
 
     public void setCharset(String charset) {
@@ -137,6 +178,12 @@ class RNWebView extends WebView implements LifecycleEventListener {
 
     public void setBaseUrl(String baseUrl) {
         this.baseUrl = baseUrl;
+    }
+
+    public void shouldOverrideWithResult(RNWebView view, ReadableArray args) {
+        if (!args.getBoolean(0)) {
+            view.loadUrl(shouldOverrideUrlLoadingUrl);
+        }
     }
 
     public String getBaseUrl() {
@@ -177,7 +224,16 @@ class RNWebView extends WebView implements LifecycleEventListener {
     }
 
     @JavascriptInterface
-     public void postMessage(String jsParamaters) {
-        mEventDispatcher.dispatchEvent(new MessageEvent(getId(), jsParamaters));
+    public void postMessage(String message) {
+        mEventDispatcher.dispatchEvent(new MessageEvent(getId(), message));
+    }
+
+    public void linkBridge() {
+      loadUrl("javascript:(" +
+        "window.originalPostMessage = window.postMessage," +
+        "window.postMessage = function(data) {" +
+          BRIDGE_NAME + ".postMessage(JSON.stringify(data));" +
+        "}" +
+      ")");
     }
 }

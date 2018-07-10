@@ -29,7 +29,8 @@ var WebViewAndroid = createClass({
     allowUrlRedirect: PropTypes.bool,
     builtInZoomControls: PropTypes.bool,
     onNavigationStateChange: PropTypes.func,
-    onMessage: PropTypes.func
+    onMessage: PropTypes.func,
+    onShouldStartLoadWithRequest: PropTypes.func,
   },
   _onNavigationStateChange: function(event) {
     if (this.props.onNavigationStateChange) {
@@ -38,8 +39,21 @@ var WebViewAndroid = createClass({
   },
   _onMessage: function(event) {
     if (this.props.onMessage) {
-      this.props.onMessage(event.nativeEvent);
+      this.props.onMessage({ nativeEvent: { data: JSON.parse(event.nativeEvent.message) }});
     }
+  },
+  _onShouldOverrideUrlLoading: function(event) {
+    let shouldOverride = false;
+
+    if (this.props.onShouldStartLoadWithRequest) {
+      shouldOverride = !this.props.onShouldStartLoadWithRequest(event.nativeEvent);
+    }
+
+    RCTUIManager.dispatchViewManagerCommand(
+      this._getWebViewHandle(),
+      RCTUIManager.RNWebViewAndroid.Commands.shouldOverrideWithResult,
+      [shouldOverride]
+    );
   },
   goBack: function() {
     RCTUIManager.dispatchViewManagerCommand(
@@ -85,12 +99,12 @@ var WebViewAndroid = createClass({
   },
   render: function() {
     return (
-      <RNWebViewAndroid 
-        ref={WEBVIEW_REF} 
-        {...this.props} 
-        onNavigationStateChange={this._onNavigationStateChange} 
-        onMessageEvent={this._onMessage} 
-      />
+      <RNWebViewAndroid
+        ref={WEBVIEW_REF}
+        {...this.props}
+        onNavigationStateChange={this._onNavigationStateChange}
+        onMessageEvent={this._onMessage}
+        onShouldOverrideUrlLoading={this._onShouldOverrideUrlLoading}/>
     );
   },
   _getWebViewHandle: function() {
