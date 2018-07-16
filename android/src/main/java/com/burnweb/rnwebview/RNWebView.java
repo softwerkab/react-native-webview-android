@@ -14,6 +14,9 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.util.Log;
 
 import com.facebook.react.ReactActivity;
@@ -43,6 +46,11 @@ class RNWebView extends WebView implements LifecycleEventListener {
     private String shouldOverrideUrlLoadingUrl = "";
 
     protected class EventWebClient extends WebViewClient {
+        private int lastErrorCode = 0;
+        private String lastFailingUrl = null;
+        private String lastErrorDescription = null;
+
+        @Override
         public boolean shouldOverrideUrlLoading(WebView view, String url){
             int navigationType = 0;
 
@@ -56,8 +64,25 @@ class RNWebView extends WebView implements LifecycleEventListener {
             return true;
         }
 
+        @Override
+        public void onPageStarted(WebView view, String url, Bitmap favicon) {
+            Log.d("RNWebView", "onPageStarted: " + url);
+
+            this.lastErrorCode = 0;
+            this.lastErrorDescription = null;
+
+            mEventDispatcher.dispatchEvent(new NavigationStateChangeEvent(getId(), SystemClock.nanoTime(), view.getTitle(), true, url, view.canGoBack(), view.canGoForward(), 0, null));
+        }
+
+        @Override
         public void onPageFinished(WebView view, String url) {
-            mEventDispatcher.dispatchEvent(new NavigationStateChangeEvent(getId(), SystemClock.nanoTime(), view.getTitle(), false, url, view.canGoBack(), view.canGoForward()));
+            Log.d("RNWebView", "onPageFinished, url: " + url + " lastFailingUrl: " + this.lastFailingUrl);
+
+            if (this.lastErrorCode == 0 && this.lastErrorDescription == null) {
+                mEventDispatcher.dispatchEvent(new NavigationStateChangeEvent(getId(), SystemClock.nanoTime(), view.getTitle(), false, url, view.canGoBack(), view.canGoForward(), 0, null));
+            } else if (url.equals(this.lastFailingUrl)) {
+                mEventDispatcher.dispatchEvent(new NavigationStateChangeEvent(getId(), SystemClock.nanoTime(), view.getTitle(), false, url, view.canGoBack(), view.canGoForward(), this.lastErrorCode, this.lastErrorDescription));
+            }
 
             currentUrl = url;
 
@@ -68,8 +93,32 @@ class RNWebView extends WebView implements LifecycleEventListener {
             }
         }
 
-        public void onPageStarted(WebView view, String url, Bitmap favicon) {
-            mEventDispatcher.dispatchEvent(new NavigationStateChangeEvent(getId(), SystemClock.nanoTime(), view.getTitle(), true, url, view.canGoBack(), view.canGoForward()));
+        @Override
+        public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+            this.lastFailingUrl = failingUrl;
+            this.lastErrorCode = errorCode;
+            this.lastErrorDescription = description;
+
+            Log.d("RNWebView", "onReceivedError (old): " + failingUrl);
+        }
+
+        @Override
+        public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+            this.lastFailingUrl = request.getUrl().toString();
+            this.lastErrorCode = error.getErrorCode();
+            this.lastErrorDescription = error.getDescription().toString();
+
+            Log.d("RNWebView", "onReceivedError (new): " + this.lastFailingUrl);
+        }
+
+
+        @Override
+        public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
+            this.lastFailingUrl = request.getUrl().toString();
+            this.lastErrorCode = errorResponse.getStatusCode();
+            this.lastErrorDescription = errorResponse.getReasonPhrase();
+
+            Log.d("RNWebView", "onReceivedHttpError: " + this.lastFailingUrl);
         }
     }
 

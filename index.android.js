@@ -8,10 +8,22 @@ var RN = require("react-native");
 var createClass = require('create-react-class');
 var PropTypes = require('prop-types');
 
-var { requireNativeComponent, NativeModules } = require('react-native');
+var { requireNativeComponent, NativeModules, StyleSheet, ActivityIndicator, View } = require('react-native');
 var RCTUIManager = NativeModules.UIManager;
 
 var WEBVIEW_REF = 'androidWebView';
+
+var WebViewState = {
+  IDLE: 'IDLE',
+  LOADING: 'LOADING',
+  ERROR: 'ERROR',
+};
+
+var defaultRenderLoading = () => (
+  <View style={[styles.loadingView]}>
+    <ActivityIndicator style={styles.loadingProgressBar} />
+  </View>
+);
 
 var WebViewAndroid = createClass({
   propTypes: {
@@ -31,8 +43,39 @@ var WebViewAndroid = createClass({
     onNavigationStateChange: PropTypes.func,
     onMessage: PropTypes.func,
     onShouldStartLoadWithRequest: PropTypes.func,
+    renderError: PropTypes.func,
+    renderLoading: PropTypes.func,
+    startInLoadingState: PropTypes.bool,
+  },
+  getDefaultProps() {
+    return {
+      startInLoadingState: false,
+    };
+  },
+  getInitialState () {
+    const { startInLoadingState } = this.props;
+
+    return {
+      startInLoadingState,
+      viewState: startInLoadingState ? WebViewState.LOADING : WebViewState.IDLE,
+      lastErrorEvent: null,
+    };
   },
   _onNavigationStateChange: function(event) {
+    const { loading, errorCode } = event.nativeEvent;
+
+    let viewState, lastErrorEvent;
+    if (loading) {
+      viewState = WebViewState.LOADING;
+    } else if (errorCode !== 0) {
+      viewState = WebViewState.ERROR;
+      lastErrorEvent = event.nativeEvent;
+    } else {
+      viewState = WebViewState.IDLE;
+    }
+
+    this.setState({ viewState, lastErrorEvent });
+
     if (this.props.onNavigationStateChange) {
       this.props.onNavigationStateChange(event.nativeEvent);
     }
@@ -70,6 +113,8 @@ var WebViewAndroid = createClass({
     );
   },
   reload: function() {
+    this.setState({ viewState: WebViewState.LOADING });
+
     RCTUIManager.dispatchViewManagerCommand(
       this._getWebViewHandle(),
       RCTUIManager.RNWebViewAndroid.Commands.reload,
@@ -98,13 +143,41 @@ var WebViewAndroid = createClass({
     );
   },
   render: function() {
-    return (
+    let otherView = null;
+    const { renderLoading, renderError, style } = this.props;
+    const { viewState, lastErrorEvent } = this.state;
+
+    if (viewState === WebViewState.LOADING) {
+      otherView = (renderLoading || defaultRenderLoading)();
+    } else if (viewState === WebViewState.ERROR) {
+      const domain = 'WebViewError';
+      let { errorCode, errorDescription } = lastErrorEvent;
+      otherView = renderError && renderError(domain, errorCode, errorDescription);
+    } else if (viewState !== WebViewState.IDLE) {
+      console.error('WebViewAndroid invalid state encountered: ' + viewState);
+    }
+
+    let webViewStyles = [styles.container, this.props.style];
+    if (viewState === WebViewState.LOADING || viewState === WebViewState.ERROR) {
+      // if we're in either LOADING or ERROR states, don't show the webView
+      webViewStyles.push(styles.hidden);
+    }
+
+    const webView = (
       <RNWebViewAndroid
         ref={WEBVIEW_REF}
         {...this.props}
+        style={webViewStyles}
         onNavigationStateChange={this._onNavigationStateChange}
         onMessageEvent={this._onMessage}
         onShouldOverrideUrlLoading={this._onShouldOverrideUrlLoading}/>
+    );
+
+    return (
+      <View style={styles.container}>
+        {webView}
+        {otherView}
+      </View>
     );
   },
   _getWebViewHandle: function() {
@@ -113,5 +186,23 @@ var WebViewAndroid = createClass({
 });
 
 var RNWebViewAndroid = requireNativeComponent('RNWebViewAndroid', null);
+
+var styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  hidden: {
+    height: 0,
+    flex: 0, // disable 'flex:1' when hiding a View
+  },
+  loadingView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingProgressBar: {
+    height: 20,
+  },
+});
 
 module.exports = WebViewAndroid;
