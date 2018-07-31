@@ -14,8 +14,10 @@ public class NavigationStateChangeEvent extends Event<NavigationStateChangeEvent
     private final String mUrl;
     private final boolean mCanGoBack;
     private final boolean mCanGoForward;
+    private final int mErrorCode;
+    private final String mErrorDescription;
 
-    public NavigationStateChangeEvent(int viewId, long timestampMs, String title, boolean isLoading, String url, boolean canGoBack, boolean canGoForward) {
+    public NavigationStateChangeEvent(int viewId, long timestampMs, String title, boolean isLoading, String url, boolean canGoBack, boolean canGoForward, int errorCode, String errorDescription) {
         super(viewId);
 
         mTitle = title;
@@ -23,6 +25,8 @@ public class NavigationStateChangeEvent extends Event<NavigationStateChangeEvent
         mUrl = url;
         mCanGoBack = canGoBack;
         mCanGoForward = canGoForward;
+        mErrorCode = errorCode;
+        mErrorDescription = errorDescription;
     }
 
     @Override
@@ -42,6 +46,8 @@ public class NavigationStateChangeEvent extends Event<NavigationStateChangeEvent
         eventData.putString("url", mUrl);
         eventData.putBoolean("canGoBack", mCanGoBack);
         eventData.putBoolean("canGoForward", mCanGoForward);
+        eventData.putInt("errorCode", mErrorCode);
+        eventData.putString("errorDescription", mErrorDescription);
 
         return eventData;
     }
