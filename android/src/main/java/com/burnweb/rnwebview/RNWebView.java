@@ -122,39 +122,6 @@ class RNWebView extends WebView implements LifecycleEventListener {
         }
     }
 
-    // protected class CustomWebChromeClient extends WebChromeClient {
-    //     @Override
-    //     public boolean onCreateWindow(WebView view, boolean dialog, boolean userGesture, android.os.Message resultMsg) {
-    //         String data = view.getHitTestResult().getExtra();
-    //         if (data != null) {
-    //             Uri uri = Uri.parse(data);
-    //             view.getContext().startActivity(new Intent(Intent.ACTION_VIEW, uri));
-    //         } else {
-    //             Log.e("RNWebView", "WebView tried to open a link in new window but did not provide URL, ignoring...");
-    //         }
-
-    //         return false;
-    //     }
-
-    //     @Override
-    //     public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
-    //         getModule().showAlert(url, message, result);
-    //         return true;
-    //     }
-
-    //     // For Android 4.1+
-    //     @SuppressWarnings("unused")
-    //     public void openFileChooser(ValueCallback<Uri> uploadMsg, String acceptType, String capture) {
-    //         getModule().startFileChooserIntent(uploadMsg, acceptType);
-    //     }
-
-    //     // For Android 5.0+
-    //     @SuppressLint("NewApi")
-    //     public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
-    //         return getModule().startFileChooserIntent(filePathCallback, fileChooserParams.createIntent());
-    //     }
-    // }
-
     protected class GeoWebChromeClient extends CustomWebChromeClient {
         @Override
         public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
@@ -240,7 +207,7 @@ class RNWebView extends WebView implements LifecycleEventListener {
     }
 
     public CustomWebChromeClient getCustomClient() {
-        return new ReactWebChromeClient(self.getContext());
+        return new ReactWebChromeClient(this.getContext());
     }
 
     public GeoWebChromeClient getGeoClient() {
