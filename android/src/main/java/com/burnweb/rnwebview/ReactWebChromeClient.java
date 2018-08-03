@@ -1,5 +1,10 @@
 package com.burnweb.rnwebview;
 
+import android.content.Intent;
+import android.net.Uri;
+import android.webkit.WebView;
+import android.util.Log;
+
 import android.content.pm.ActivityInfo;
 import android.app.Activity;
 import android.graphics.Color;
@@ -32,6 +37,37 @@ public class ReactWebChromeClient extends WebChromeClient {
 
   public ReactWebChromeClient(ReactContext reactContext) {
     mReactContext = reactContext;
+  }
+
+  @Override
+  public boolean onCreateWindow(WebView view, boolean dialog, boolean userGesture, android.os.Message resultMsg) {
+      String data = view.getHitTestResult().getExtra();
+      if (data != null) {
+          Uri uri = Uri.parse(data);
+          view.getContext().startActivity(new Intent(Intent.ACTION_VIEW, uri));
+      } else {
+          Log.e("RNWebView", "WebView tried to open a link in new window but did not provide URL, ignoring...");
+      }
+
+      return false;
+  }
+
+  @Override
+  public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
+      getModule().showAlert(url, message, result);
+      return true;
+  }
+
+  // For Android 4.1+
+  @SuppressWarnings("unused")
+  public void openFileChooser(ValueCallback<Uri> uploadMsg, String acceptType, String capture) {
+      getModule().startFileChooserIntent(uploadMsg, acceptType);
+  }
+
+  // For Android 5.0+
+  @SuppressLint("NewApi")
+  public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
+      return getModule().startFileChooserIntent(filePathCallback, fileChooserParams.createIntent());
   }
 
   @Override
